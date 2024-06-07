@@ -167,19 +167,19 @@ func testGoFlags() string {
 // Note that we don't run with the extended tag. Currently not supported in 32 bit.
 func Test386() error {
 	env := map[string]string{"GOARCH": "386", "GOFLAGS": testGoFlags()}
-	return runCmd(env, goexe, "test", "-p", "2", "./...")
+	return runCmd(env, goexe, "test", "-p", os.Getenv("VCPU_COUNT"), "./...")
 }
 
 // Run tests
 func Test() error {
 	env := map[string]string{"GOFLAGS": testGoFlags()}
-	return runCmd(env, goexe, "test", "-p", "2", "./...", "-tags", buildTags())
+	return runCmd(env, goexe, "test", "-p", os.Getenv("VCPU_COUNT"), "./...", "-tags", buildTags())
 }
 
 // Run tests with race detector
 func TestRace() error {
 	env := map[string]string{"GOFLAGS": testGoFlags()}
-	return runCmd(env, goexe, "test", "-p", "2", "-race", "./...", "-tags", buildTags())
+	return runCmd(env, goexe, "test", "-p", os.Getenv("VCPU_COUNT"), "-race", "./...", "-tags", buildTags())
 }
 
 // Run gofmt linter

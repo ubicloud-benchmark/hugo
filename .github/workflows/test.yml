@@ -2,6 +2,8 @@ on:
   push:
     branches: [master]
   pull_request:
+  schedule:
+    - cron:  '0 10 * * 0'
 name: Test
 env:
   GOPROXY: https://proxy.golang.org
@@ -14,14 +16,28 @@ permissions:
   contents: read
 jobs:
   test:
+    name: ${{ matrix.os.name }}
     strategy:
       matrix:
-        go-version: [1.21.x, 1.22.x]
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+        go-version: [1.22.x]
+        os:
+          - name: ubuntu-latest
+            vcpu: 2
+          - name: ubicloud-standard-2
+            vcpu: 2
+          - name: ubicloud-standard-4
+            vcpu: 4
+          - name: ubicloud-standard-8
+            vcpu: 8
+          - name: ubicloud-standard-16
+            vcpu: 16
+          - name: ubicloud-standard-30
+            vcpu: 30
+    runs-on: ${{ matrix.os.name }}
+    env:
+      VCPU_COUNT: ${{ matrix.os.vcpu }}
     steps:
-      - if: matrix.os == 'ubuntu-latest'
-        name: Free Disk Space (Ubuntu)
+      - name: Free Disk Space (Ubuntu)
         uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
         with:
           # this might remove tools that are actually needed,
@@ -35,6 +51,8 @@ jobs:
           swap-storage: true
       - name: Checkout code
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+      - name: Show cpu info
+        run: lscpu
       - name: Install Go
         uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491
         with:
@@ -61,23 +79,21 @@ jobs:
         run: |
           pip install docutils
           rst2html --version
-      - if: matrix.os == 'ubuntu-latest'
-        name: Install pandoc on Linux
+      - name: Install pandoc on Linux
         run: |
           sudo apt-get update -y
           sudo apt-get install -y pandoc
-      - if: matrix.os == 'macos-latest'
+      - if: matrix.os.name == 'macos-latest'
         run: |
           brew install pandoc
-      - if: matrix.os == 'windows-latest'
+      - if: matrix.os.name == 'windows-latest'
         run: |
           choco install pandoc
       - run: pandoc -v
-      - if: matrix.os == 'windows-latest'
+      - if: matrix.os.name == 'windows-latest'
         run: |
           choco install mingw
-      - if: matrix.os == 'ubuntu-latest'
-        name: Install dart-sass Linux
+      - name: Install dart-sass Linux
         run: |
           echo "Install Dart Sass version ${SASS_VERSION} ..."
           curl -LJO "https://github.com/sass/dart-sass/releases/download/${SASS_VERSION}/dart-sass-${SASS_VERSION}-linux-x64.tar.gz";
@@ -85,7 +101,7 @@ jobs:
           tar -xvf "dart-sass-${SASS_VERSION}-linux-x64.tar.gz";
           echo "$GOBIN"
           echo "$GITHUB_WORKSPACE/dart-sass/" >> $GITHUB_PATH
-      - if: matrix.os == 'macos-latest'
+      - if: matrix.os.name == 'macos-latest'
         name: Install dart-sass MacOS
         run: |
           echo "Install Dart Sass version ${SASS_VERSION} ..."
@@ -93,27 +109,25 @@ jobs:
           echo "${DART_SASS_SHA_MACOS}  dart-sass-${SASS_VERSION}-macos-x64.tar.gz" | shasum -a 256 -c;
           tar -xvf "dart-sass-${SASS_VERSION}-macos-x64.tar.gz";
           echo "$GITHUB_WORKSPACE/dart-sass/" >> $GITHUB_PATH
-      - if: matrix.os == 'windows-latest'
+      - if: matrix.os.name == 'windows-latest'
         name: Install dart-sass Windows
         run: |
           echo "Install Dart Sass version ${env:SASS_VERSION} ..."
           curl -LJO "https://github.com/sass/dart-sass/releases/download/${env:SASS_VERSION}/dart-sass-${env:SASS_VERSION}-windows-x64.zip";
           Expand-Archive -Path "dart-sass-${env:SASS_VERSION}-windows-x64.zip" -DestinationPath .;
           echo  "$env:GITHUB_WORKSPACE/dart-sass/" | Out-File -FilePath $Env:GITHUB_PATH -Encoding utf-8 -Append
-      - if: matrix.os == 'ubuntu-latest'
-        name: Install staticcheck
+      - name: Install staticcheck
         run: go install honnef.co/go/tools/cmd/staticcheck@latest
-      - if: matrix.os == 'ubuntu-latest'
-        name: Run staticcheck
+      - name: Run staticcheck
         run: staticcheck ./...
-      - if: matrix.os != 'windows-latest'
+      - if: matrix.os.name != 'windows-latest'
         name: Check
         run: |
           sass --version;
           mage -v check;
         env:
           HUGO_BUILD_TAGS: extended
-      - if: matrix.os == 'windows-latest'
+      - if: matrix.os.name == 'windows-latest'
         # See issue #11052. We limit the build to regular test (no -race flag) on Windows for now.
         name: Test
         run: |
@@ -123,8 +137,7 @@ jobs:
       - name: Build tags
         run: |
           go install -tags extended,nodeploy
-      - if: matrix.os == 'ubuntu-latest'
-        name: Build for dragonfly
+      - name: Build for dragonfly
         run: |
           go install
         env:
